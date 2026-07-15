@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CircleDefenseGame.Tests/CircleDefenseGame.Tests.csproj" />
+  <Project Path="CircleDefenseGame/CircleDefenseGame.csproj" />
+</Solution>
