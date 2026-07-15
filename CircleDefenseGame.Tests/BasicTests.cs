@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace CircleDefenseGame.Tests;
 
@@ -27,9 +28,21 @@ public class BasicTests
             using var expectedImage = new Bitmap(baselinePath);
             using var actualImage = new Bitmap(screenshotPath);
 
-            await Assert.That(actualImage.Width).IsEqualTo(expectedImage.Width);
-            await Assert.That(actualImage.Height).IsEqualTo(expectedImage.Height);
-            await Assert.That(FindFirstPixelDifference(expectedImage, actualImage)).IsNull();
+            ImageDifference? difference = FindFirstImageDifference(expectedImage, actualImage);
+
+            if (difference is not null)
+            {
+                string comparisonPath = CreateSideBySideComparison(expectedImage, actualImage);
+
+                TestContext.Current!.Output.AttachArtifact(new Artifact
+                {
+                    File = new FileInfo(comparisonPath),
+                    DisplayName = "Expected vs. actual screenshot",
+                    Description = difference.Description,
+                });
+            }
+
+            await Assert.That(difference).IsNull();
         }
         finally
         {
@@ -100,10 +113,17 @@ public class BasicTests
         throw new DirectoryNotFoundException("Could not find the test project directory.");
     }
 
-    private static PixelDifference? FindFirstPixelDifference(
+    private static ImageDifference? FindFirstImageDifference(
         Bitmap expectedImage,
         Bitmap actualImage)
     {
+        if (expectedImage.Width != actualImage.Width || expectedImage.Height != actualImage.Height)
+        {
+            return new ImageDifference(
+                $"Expected {expectedImage.Width}x{expectedImage.Height}, "
+                + $"but found {actualImage.Width}x{actualImage.Height}.");
+        }
+
         for (int row = 0; row < expectedImage.Height; row++)
         {
             for (int column = 0; column < expectedImage.Width; column++)
@@ -113,7 +133,8 @@ public class BasicTests
 
                 if (expectedPixel != actualPixel)
                 {
-                    return new PixelDifference(column, row, expectedPixel, actualPixel);
+                    return new ImageDifference(
+                        $"Pixel ({column}, {row}) expected {expectedPixel}, but found {actualPixel}.");
                 }
             }
         }
@@ -121,5 +142,25 @@ public class BasicTests
         return null;
     }
 
-    private sealed record PixelDifference(int Column, int Row, Color Expected, Color Actual);
+    private static string CreateSideBySideComparison(Bitmap expectedImage, Bitmap actualImage)
+    {
+        const int HeaderHeight = 32;
+        string comparisonPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}-visual-comparison.png");
+
+        using var comparisonImage = new Bitmap(
+            expectedImage.Width + actualImage.Width,
+            Math.Max(expectedImage.Height, actualImage.Height) + HeaderHeight);
+        using Graphics graphics = Graphics.FromImage(comparisonImage);
+
+        graphics.Clear(Color.DimGray);
+        graphics.DrawString("Expected", SystemFonts.DefaultFont, Brushes.White, 4, 8);
+        graphics.DrawString("Actual", SystemFonts.DefaultFont, Brushes.White, expectedImage.Width + 4, 8);
+        graphics.DrawImageUnscaled(expectedImage, 0, HeaderHeight);
+        graphics.DrawImageUnscaled(actualImage, expectedImage.Width, HeaderHeight);
+        comparisonImage.Save(comparisonPath, ImageFormat.Png);
+
+        return comparisonPath;
+    }
+
+    private sealed record ImageDifference(string Description);
 }
