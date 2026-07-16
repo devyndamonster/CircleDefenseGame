@@ -5,6 +5,36 @@ namespace CircleDefenseGame.Tests;
 
 internal static class ImageComparison
 {
+    public static bool DoesImageMatchExistingSnapshot(Bitmap currentScreen, string snapshotName)
+    {
+        string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", $"{snapshotName}.png");
+
+        if (!File.Exists(baselinePath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(baselinePath)!);
+            currentScreen.Save(baselinePath, ImageFormat.Png);
+            return true;
+        }
+
+        using var expectedImage = new Bitmap(baselinePath);
+        ImageDifference? difference = FindFirstDifference(expectedImage, currentScreen);
+
+        if (difference is null)
+        {
+            return true;
+        }
+
+        string comparisonPath = CreateSideBySideComparison(expectedImage, currentScreen);
+        TestContext.Current!.Output.AttachArtifact(new Artifact
+        {
+            File = new FileInfo(comparisonPath),
+            DisplayName = "Expected vs. actual screenshot",
+            Description = difference.Description,
+        });
+
+        return false;
+    }
+
     public static ImageDifference? FindFirstDifference(Bitmap expectedImage, Bitmap actualImage)
     {
         if (expectedImage.Width != actualImage.Width || expectedImage.Height != actualImage.Height)
@@ -88,6 +118,21 @@ internal static class ImageComparison
                 }
             }
         }
+    }
+
+    private static string GetProjectDirectory()
+    {
+        for (DirectoryInfo? directory = new(AppContext.BaseDirectory);
+            directory is not null;
+            directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "CircleDefenseGame.Tests.csproj")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not find the test project directory.");
     }
 }
 

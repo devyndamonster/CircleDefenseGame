@@ -12,68 +12,24 @@ namespace CircleDefenseGame.Tests;
 internal static class ScreenshotCapture
 {
     private const int DwmaExtendedFrameBounds = 9;
-    private static readonly TimeSpan WindowReadyDelay = TimeSpan.FromMilliseconds(200);
-
     private static readonly Guid GraphicsCaptureItemGuid =
         new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
 
-    public static async Task CaptureGameScreenshotAsync(
-        string screenshotPath,
-        TimeSpan? screenshotDelay)
+    public static Bitmap CaptureGameScreenshot(Process game)
     {
-        using var cancellationTokenSource = new CancellationTokenSource(
-            (screenshotDelay ?? TimeSpan.Zero) + TimeSpan.FromSeconds(10));
-        CancellationToken cancellationToken = cancellationTokenSource.Token;
-        string gameExecutablePath = Path.Combine(AppContext.BaseDirectory, "CircleDefenseGame.exe");
-
-        if (!File.Exists(gameExecutablePath))
+        if (game.HasExited)
         {
-            throw new FileNotFoundException(
-                "The game executable was not copied to the test output directory.",
-                gameExecutablePath);
+            throw new InvalidOperationException(
+                $"The game exited with code {game.ExitCode} before its screenshot was captured.");
         }
 
-        var startInfo = new ProcessStartInfo(gameExecutablePath)
-        {
-            UseShellExecute = false,
-            WorkingDirectory = AppContext.BaseDirectory,
-        };
-
-        using Process process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("The game process could not be started.");
-
-        try
-        {
-            IntPtr windowHandle = await WaitForWindowHandleAsync(process, cancellationToken);
-            await Task.Delay(WindowReadyDelay, cancellationToken);
-
-            if (screenshotDelay is not null)
-            {
-                await Task.Delay(screenshotDelay.Value, cancellationToken);
-            }
-
-            await SaveWindowScreenshotAsync(windowHandle, screenshotPath, cancellationToken);
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync();
-            }
-        }
-
-        if (!File.Exists(screenshotPath))
-        {
-            throw new FileNotFoundException(
-                "The window capture did not create its screenshot.",
-                screenshotPath);
-        }
+        return CaptureWindowScreenshotAsync(game.MainWindowHandle, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
     }
 
-    public static async Task SaveWindowScreenshotAsync(
+    private static async Task<Bitmap> CaptureWindowScreenshotAsync(
         IntPtr windowHandle,
-        string screenshotPath,
         CancellationToken cancellationToken)
     {
         SetProcessDpiAwarenessContext(new IntPtr(-4));
@@ -128,7 +84,7 @@ internal static class ScreenshotCapture
             clientScreenshot.UnlockBits(bitmapData);
         }
 
-        clientScreenshot.Save(screenshotPath, ImageFormat.Png);
+        return new Bitmap(clientScreenshot);
     }
 
     private static void SetPixelsOpaque(byte[] pixels)
@@ -136,30 +92,6 @@ internal static class ScreenshotCapture
         for (int index = 0; index < pixels.Length; index += 4)
         {
             pixels[index + 3] = byte.MaxValue;
-        }
-    }
-
-    private static async Task<IntPtr> WaitForWindowHandleAsync(
-        Process process,
-        CancellationToken cancellationToken)
-    {
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            process.Refresh();
-
-            if (process.MainWindowHandle != IntPtr.Zero)
-            {
-                return process.MainWindowHandle;
-            }
-
-            if (process.HasExited)
-            {
-                throw new InvalidOperationException(
-                    $"The game exited with code {process.ExitCode} before creating its window.");
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
         }
     }
 
