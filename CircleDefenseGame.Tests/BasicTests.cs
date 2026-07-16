@@ -4,8 +4,6 @@ namespace CircleDefenseGame.Tests;
 
 public class BasicTests
 {
-    private static readonly SemaphoreSlim VisualTestLock = new(1, 1);
-
     [Test]
     public async Task InitialGridScreenshot_MatchesOrCreatesBaseline()
     {
@@ -24,59 +22,51 @@ public class BasicTests
         string snapshotName,
         double? screenshotDelaySeconds = null)
     {
-        await VisualTestLock.WaitAsync();
+        string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", $"{snapshotName}.png");
+        string screenshotPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+
         try
         {
-            string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", $"{snapshotName}.png");
-            string screenshotPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+            await ScreenshotCapture.CaptureGameScreenshotAsync(
+                screenshotPath,
+                screenshotDelaySeconds is null
+                    ? null
+                    : TimeSpan.FromSeconds(screenshotDelaySeconds.Value));
 
-            try
+            if (!File.Exists(baselinePath))
             {
-                await ScreenshotCapture.CaptureGameScreenshotAsync(
-                    screenshotPath,
-                    screenshotDelaySeconds is null
-                        ? null
-                        : TimeSpan.FromSeconds(screenshotDelaySeconds.Value));
+                Directory.CreateDirectory(Path.GetDirectoryName(baselinePath)!);
+                File.Move(screenshotPath, baselinePath);
 
-                if (!File.Exists(baselinePath))
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(baselinePath)!);
-                    File.Move(screenshotPath, baselinePath);
-
-                    await Assert.That(File.Exists(baselinePath)).IsTrue();
-                    return;
-                }
-
-                using var expectedImage = new Bitmap(baselinePath);
-                using var actualImage = new Bitmap(screenshotPath);
-
-                ImageDifference? difference = ImageComparison.FindFirstDifference(expectedImage, actualImage);
-
-                if (difference is not null)
-                {
-                    string comparisonPath = ImageComparison.CreateSideBySideComparison(expectedImage, actualImage);
-
-                    TestContext.Current!.Output.AttachArtifact(new Artifact
-                    {
-                        File = new FileInfo(comparisonPath),
-                        DisplayName = "Expected vs. actual screenshot",
-                        Description = difference.Description,
-                    });
-                }
-
-                await Assert.That(difference).IsNull();
+                await Assert.That(File.Exists(baselinePath)).IsTrue();
+                return;
             }
-            finally
+
+            using var expectedImage = new Bitmap(baselinePath);
+            using var actualImage = new Bitmap(screenshotPath);
+
+            ImageDifference? difference = ImageComparison.FindFirstDifference(expectedImage, actualImage);
+
+            if (difference is not null)
             {
-                if (File.Exists(screenshotPath))
+                string comparisonPath = ImageComparison.CreateSideBySideComparison(expectedImage, actualImage);
+
+                TestContext.Current!.Output.AttachArtifact(new Artifact
                 {
-                    File.Delete(screenshotPath);
-                }
+                    File = new FileInfo(comparisonPath),
+                    DisplayName = "Expected vs. actual screenshot",
+                    Description = difference.Description,
+                });
             }
+
+            await Assert.That(difference).IsNull();
         }
         finally
         {
-            VisualTestLock.Release();
+            if (File.Exists(screenshotPath))
+            {
+                File.Delete(screenshotPath);
+            }
         }
     }
 
