@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -8,12 +9,67 @@ using Windows.Graphics.DirectX;
 
 namespace CircleDefenseGame.Tests;
 
-internal static class WindowsGraphicsCapture
+internal static class ScreenshotCapture
 {
     private const int DwmaExtendedFrameBounds = 9;
+    private static readonly TimeSpan WindowReadyDelay = TimeSpan.FromMilliseconds(200);
 
     private static readonly Guid GraphicsCaptureItemGuid =
         new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
+
+    public static async Task CaptureGameScreenshotAsync(
+        string screenshotPath,
+        TimeSpan? screenshotDelay)
+    {
+        using var cancellationTokenSource = new CancellationTokenSource(
+            (screenshotDelay ?? TimeSpan.Zero) + TimeSpan.FromSeconds(10));
+        CancellationToken cancellationToken = cancellationTokenSource.Token;
+        string gameExecutablePath = Path.Combine(AppContext.BaseDirectory, "CircleDefenseGame.exe");
+
+        if (!File.Exists(gameExecutablePath))
+        {
+            throw new FileNotFoundException(
+                "The game executable was not copied to the test output directory.",
+                gameExecutablePath);
+        }
+
+        var startInfo = new ProcessStartInfo(gameExecutablePath)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = AppContext.BaseDirectory,
+        };
+
+        using Process process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("The game process could not be started.");
+
+        try
+        {
+            IntPtr windowHandle = await WaitForWindowHandleAsync(process, cancellationToken);
+            await Task.Delay(WindowReadyDelay, cancellationToken);
+
+            if (screenshotDelay is not null)
+            {
+                await Task.Delay(screenshotDelay.Value, cancellationToken);
+            }
+
+            await SaveWindowScreenshotAsync(windowHandle, screenshotPath, cancellationToken);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+        }
+
+        if (!File.Exists(screenshotPath))
+        {
+            throw new FileNotFoundException(
+                "The window capture did not create its screenshot.",
+                screenshotPath);
+        }
+    }
 
     public static async Task SaveWindowScreenshotAsync(
         IntPtr windowHandle,
@@ -80,6 +136,30 @@ internal static class WindowsGraphicsCapture
         for (int index = 0; index < pixels.Length; index += 4)
         {
             pixels[index + 3] = byte.MaxValue;
+        }
+    }
+
+    private static async Task<IntPtr> WaitForWindowHandleAsync(
+        Process process,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            process.Refresh();
+
+            if (process.MainWindowHandle != IntPtr.Zero)
+            {
+                return process.MainWindowHandle;
+            }
+
+            if (process.HasExited)
+            {
+                throw new InvalidOperationException(
+                    $"The game exited with code {process.ExitCode} before creating its window.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
         }
     }
 
