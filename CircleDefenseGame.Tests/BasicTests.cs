@@ -1,12 +1,13 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Globalization;
 
 namespace CircleDefenseGame.Tests;
 
 public class BasicTests
 {
+    private static readonly SemaphoreSlim VisualTestLock = new(1, 1);
+
     [Test]
     public async Task InitialGridScreenshot_MatchesOrCreatesBaseline()
     {
@@ -25,47 +26,55 @@ public class BasicTests
         string snapshotName,
         double? screenshotDelaySeconds = null)
     {
-        string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", $"{snapshotName}.png");
-        string screenshotPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
-
+        await VisualTestLock.WaitAsync();
         try
         {
-            await CaptureScreenshot(screenshotPath, screenshotDelaySeconds);
+            string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", $"{snapshotName}.png");
+            string screenshotPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
 
-            if (!File.Exists(baselinePath))
+            try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(baselinePath)!);
-                File.Move(screenshotPath, baselinePath);
+                await CaptureScreenshot(screenshotPath, screenshotDelaySeconds);
 
-                await Assert.That(File.Exists(baselinePath)).IsTrue();
-                return;
-            }
-
-            using var expectedImage = new Bitmap(baselinePath);
-            using var actualImage = new Bitmap(screenshotPath);
-
-            ImageDifference? difference = FindFirstImageDifference(expectedImage, actualImage);
-
-            if (difference is not null)
-            {
-                string comparisonPath = CreateSideBySideComparison(expectedImage, actualImage);
-
-                TestContext.Current!.Output.AttachArtifact(new Artifact
+                if (!File.Exists(baselinePath))
                 {
-                    File = new FileInfo(comparisonPath),
-                    DisplayName = "Expected vs. actual screenshot",
-                    Description = difference.Description,
-                });
-            }
+                    Directory.CreateDirectory(Path.GetDirectoryName(baselinePath)!);
+                    File.Move(screenshotPath, baselinePath);
 
-            await Assert.That(difference).IsNull();
+                    await Assert.That(File.Exists(baselinePath)).IsTrue();
+                    return;
+                }
+
+                using var expectedImage = new Bitmap(baselinePath);
+                using var actualImage = new Bitmap(screenshotPath);
+
+                ImageDifference? difference = FindFirstImageDifference(expectedImage, actualImage);
+
+                if (difference is not null)
+                {
+                    string comparisonPath = CreateSideBySideComparison(expectedImage, actualImage);
+
+                    TestContext.Current!.Output.AttachArtifact(new Artifact
+                    {
+                        File = new FileInfo(comparisonPath),
+                        DisplayName = "Expected vs. actual screenshot",
+                        Description = difference.Description,
+                    });
+                }
+
+                await Assert.That(difference).IsNull();
+            }
+            finally
+            {
+                if (File.Exists(screenshotPath))
+                {
+                    File.Delete(screenshotPath);
+                }
+            }
         }
         finally
         {
-            if (File.Exists(screenshotPath))
-            {
-                File.Delete(screenshotPath);
-            }
+            VisualTestLock.Release();
         }
     }
 
@@ -80,18 +89,9 @@ public class BasicTests
 
         var startInfo = new ProcessStartInfo(gameExecutablePath)
         {
-            CreateNoWindow = true,
             UseShellExecute = false,
             WorkingDirectory = AppContext.BaseDirectory,
         };
-        startInfo.ArgumentList.Add("--screenshot");
-        startInfo.ArgumentList.Add(screenshotPath);
-        if (screenshotDelaySeconds is not null)
-        {
-            startInfo.ArgumentList.Add("--screenshot-after-seconds");
-            startInfo.ArgumentList.Add(
-                screenshotDelaySeconds.Value.ToString(CultureInfo.InvariantCulture));
-        }
 
         using Process process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("The game process could not be started.");
@@ -100,24 +100,55 @@ public class BasicTests
 
         try
         {
-            await process.WaitForExitAsync(cancellationTokenSource.Token);
+            IntPtr windowHandle = await WaitForWindowHandle(process, cancellationTokenSource.Token);
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationTokenSource.Token);
+
+            if (screenshotDelaySeconds is not null)
+            {
+                await Task.Delay(
+                    TimeSpan.FromSeconds(screenshotDelaySeconds.Value),
+                    cancellationTokenSource.Token);
+            }
+
+            await WindowsGraphicsCapture.SaveWindowScreenshotAsync(
+                windowHandle,
+                screenshotPath,
+                cancellationTokenSource.Token);
         }
         finally
         {
             if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
             }
-        }
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"The game screenshot process exited with code {process.ExitCode}.");
         }
 
         if (!File.Exists(screenshotPath))
         {
-            throw new FileNotFoundException("The game did not create its screenshot.", screenshotPath);
+            throw new FileNotFoundException("The window capture did not create its screenshot.", screenshotPath);
+        }
+    }
+
+    private static async Task<IntPtr> WaitForWindowHandle(Process process, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            process.Refresh();
+
+            if (process.MainWindowHandle != IntPtr.Zero)
+            {
+                return process.MainWindowHandle;
+            }
+
+            if (process.HasExited)
+            {
+                throw new InvalidOperationException(
+                    $"The game exited with code {process.ExitCode} before creating its window.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
         }
     }
 

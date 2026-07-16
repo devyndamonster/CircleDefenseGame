@@ -1,4 +1,3 @@
-using System.Globalization;
 using Raylib_cs;
 
 namespace CircleDefenseGame;
@@ -10,20 +9,17 @@ internal static class Program
     private const int CircleRadiusInSquares = 30;
     private const int WindowSize = GridSize * CellSize;
     private const int RandomSeed = 12343;
-    private const int ScreenshotFrameCount = 2;
     private const double RedTileIntervalSeconds = 1;
 
     [STAThread]
-    private static void Main(string[] args)
+    private static void Main()
     {
-        ScreenshotRequest? screenshotRequest = GetScreenshotRequest(args);
         var random = new Random(RandomSeed);
         Color[,] gridColors = CreateGridColors(random);
 
         Raylib.InitWindow(WindowSize, WindowSize, "Circle Defense Game");
         Raylib.SetTargetFPS(60);
 
-        int renderedFrames = 0;
         double nextRedTileTime = RedTileIntervalSeconds;
 
         while (!Raylib.WindowShouldClose())
@@ -40,60 +36,9 @@ internal static class Program
             DrawGrid(gridColors);
 
             Raylib.EndDrawing();
-            renderedFrames++;
-
-            if (screenshotRequest is not null
-                && (screenshotRequest.CaptureAfterSeconds is null
-                    ? renderedFrames == ScreenshotFrameCount
-                    : Raylib.GetTime() >= screenshotRequest.CaptureAfterSeconds))
-            {
-                Raylib.TakeScreenshot(screenshotRequest.Path);
-                break;
-            }
         }
 
         Raylib.CloseWindow();
-    }
-
-    private static ScreenshotRequest? GetScreenshotRequest(string[] args)
-    {
-        if (args.Length == 0)
-        {
-            return null;
-        }
-
-        if ((args.Length != 2 && args.Length != 4)
-            || args[0] != "--screenshot"
-            || string.IsNullOrWhiteSpace(args[1])
-            || (args.Length == 4 && args[2] != "--screenshot-after-seconds"))
-        {
-            throw new ArgumentException(
-                "Usage: CircleDefenseGame [--screenshot <path> [--screenshot-after-seconds <seconds>]]");
-        }
-
-        string screenshotPath = Path.GetFullPath(args[1]);
-        string screenshotDirectory = Path.GetDirectoryName(screenshotPath)
-            ?? throw new InvalidOperationException("The screenshot path does not include a directory.");
-
-        Directory.CreateDirectory(screenshotDirectory);
-        Directory.SetCurrentDirectory(screenshotDirectory);
-
-        if (args.Length == 2)
-        {
-            return new ScreenshotRequest(Path.GetFileName(screenshotPath), null);
-        }
-
-        if (!double.TryParse(
-                args[3],
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out double captureAfterSeconds)
-            || captureAfterSeconds <= 0)
-        {
-            throw new ArgumentException("The screenshot capture delay must be a positive number of seconds.");
-        }
-
-        return new ScreenshotRequest(Path.GetFileName(screenshotPath), captureAfterSeconds);
     }
 
     private static Color[,] CreateGridColors(Random random)
@@ -149,6 +94,4 @@ internal static class Program
             }
         }
     }
-
-    private sealed record ScreenshotRequest(string Path, double? CaptureAfterSeconds);
 }
