@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 
 namespace CircleDefenseGame.Tests;
 
@@ -9,12 +10,27 @@ public class BasicTests
     [Test]
     public async Task InitialGridScreenshot_MatchesOrCreatesBaseline()
     {
-        string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", "InitialGrid.png");
+        await AssertScreenshotMatchesOrCreatesBaseline("InitialGrid");
+    }
+
+    [Test]
+    public async Task RedTilesAfterFiveSecondsScreenshot_MatchesOrCreatesBaseline()
+    {
+        await AssertScreenshotMatchesOrCreatesBaseline(
+            "RedTilesAfterFiveSeconds",
+            screenshotDelaySeconds: 5);
+    }
+
+    private static async Task AssertScreenshotMatchesOrCreatesBaseline(
+        string snapshotName,
+        double? screenshotDelaySeconds = null)
+    {
+        string baselinePath = Path.Combine(GetProjectDirectory(), "Snapshots", $"{snapshotName}.png");
         string screenshotPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
 
         try
         {
-            await CaptureScreenshot(screenshotPath);
+            await CaptureScreenshot(screenshotPath, screenshotDelaySeconds);
 
             if (!File.Exists(baselinePath))
             {
@@ -53,7 +69,7 @@ public class BasicTests
         }
     }
 
-    private static async Task CaptureScreenshot(string screenshotPath)
+    private static async Task CaptureScreenshot(string screenshotPath, double? screenshotDelaySeconds)
     {
         string gameExecutablePath = Path.Combine(AppContext.BaseDirectory, "CircleDefenseGame.exe");
 
@@ -70,10 +86,17 @@ public class BasicTests
         };
         startInfo.ArgumentList.Add("--screenshot");
         startInfo.ArgumentList.Add(screenshotPath);
+        if (screenshotDelaySeconds is not null)
+        {
+            startInfo.ArgumentList.Add("--screenshot-after-seconds");
+            startInfo.ArgumentList.Add(
+                screenshotDelaySeconds.Value.ToString(CultureInfo.InvariantCulture));
+        }
 
         using Process process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("The game process could not be started.");
-        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cancellationTokenSource = new CancellationTokenSource(
+            TimeSpan.FromSeconds((screenshotDelaySeconds ?? 0) + 10));
 
         try
         {

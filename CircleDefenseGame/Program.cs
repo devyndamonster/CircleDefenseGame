@@ -1,3 +1,4 @@
+using System.Globalization;
 using Raylib_cs;
 
 namespace CircleDefenseGame;
@@ -10,20 +11,29 @@ internal static class Program
     private const int WindowSize = GridSize * CellSize;
     private const int RandomSeed = 12343;
     private const int ScreenshotFrameCount = 2;
+    private const double RedTileIntervalSeconds = 1;
 
     [STAThread]
     private static void Main(string[] args)
     {
-        string? screenshotPath = GetScreenshotPath(args);
-        Color[,] gridColors = CreateGridColors();
+        ScreenshotRequest? screenshotRequest = GetScreenshotRequest(args);
+        var random = new Random(RandomSeed);
+        Color[,] gridColors = CreateGridColors(random);
 
         Raylib.InitWindow(WindowSize, WindowSize, "Circle Defense Game");
         Raylib.SetTargetFPS(60);
 
         int renderedFrames = 0;
+        double nextRedTileTime = RedTileIntervalSeconds;
 
         while (!Raylib.WindowShouldClose())
         {
+            while (Raylib.GetTime() >= nextRedTileTime)
+            {
+                TurnRandomTileRed(gridColors, random);
+                nextRedTileTime += RedTileIntervalSeconds;
+            }
+
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.Black);
 
@@ -32,9 +42,12 @@ internal static class Program
             Raylib.EndDrawing();
             renderedFrames++;
 
-            if (screenshotPath is not null && renderedFrames == ScreenshotFrameCount)
+            if (screenshotRequest is not null
+                && (screenshotRequest.CaptureAfterSeconds is null
+                    ? renderedFrames == ScreenshotFrameCount
+                    : Raylib.GetTime() >= screenshotRequest.CaptureAfterSeconds))
             {
-                Raylib.TakeScreenshot(screenshotPath);
+                Raylib.TakeScreenshot(screenshotRequest.Path);
                 break;
             }
         }
@@ -42,16 +55,20 @@ internal static class Program
         Raylib.CloseWindow();
     }
 
-    private static string? GetScreenshotPath(string[] args)
+    private static ScreenshotRequest? GetScreenshotRequest(string[] args)
     {
         if (args.Length == 0)
         {
             return null;
         }
 
-        if (args.Length != 2 || args[0] != "--screenshot" || string.IsNullOrWhiteSpace(args[1]))
+        if ((args.Length != 2 && args.Length != 4)
+            || args[0] != "--screenshot"
+            || string.IsNullOrWhiteSpace(args[1])
+            || (args.Length == 4 && args[2] != "--screenshot-after-seconds"))
         {
-            throw new ArgumentException("Usage: CircleDefenseGame [--screenshot <path>]");
+            throw new ArgumentException(
+                "Usage: CircleDefenseGame [--screenshot <path> [--screenshot-after-seconds <seconds>]]");
         }
 
         string screenshotPath = Path.GetFullPath(args[1]);
@@ -61,12 +78,26 @@ internal static class Program
         Directory.CreateDirectory(screenshotDirectory);
         Directory.SetCurrentDirectory(screenshotDirectory);
 
-        return Path.GetFileName(screenshotPath);
+        if (args.Length == 2)
+        {
+            return new ScreenshotRequest(Path.GetFileName(screenshotPath), null);
+        }
+
+        if (!double.TryParse(
+                args[3],
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out double captureAfterSeconds)
+            || captureAfterSeconds <= 0)
+        {
+            throw new ArgumentException("The screenshot capture delay must be a positive number of seconds.");
+        }
+
+        return new ScreenshotRequest(Path.GetFileName(screenshotPath), captureAfterSeconds);
     }
 
-    private static Color[,] CreateGridColors()
+    private static Color[,] CreateGridColors(Random random)
     {
-        var random = new Random(RandomSeed);
         var colors = new Color[GridSize, GridSize];
 
         for (int row = 0; row < GridSize; row++)
@@ -84,6 +115,13 @@ internal static class Program
         }
 
         return colors;
+    }
+
+    private static void TurnRandomTileRed(Color[,] gridColors, Random random)
+    {
+        int row = random.Next(GridSize);
+        int column = random.Next(GridSize);
+        gridColors[row, column] = Color.Red;
     }
 
     private static bool IsInsideCenterCircle(int row, int column)
@@ -111,4 +149,6 @@ internal static class Program
             }
         }
     }
+
+    private sealed record ScreenshotRequest(string Path, double? CaptureAfterSeconds);
 }
