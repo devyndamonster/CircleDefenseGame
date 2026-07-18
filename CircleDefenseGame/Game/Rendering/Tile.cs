@@ -1,7 +1,7 @@
 ﻿using Raylib_cs;
 using Color = Raylib_cs.Color;
 
-namespace CircleDefenseGame.Game.Renderables
+namespace CircleDefenseGame.Game.Rendering
 {
     public class Tile : IRenderable
     {

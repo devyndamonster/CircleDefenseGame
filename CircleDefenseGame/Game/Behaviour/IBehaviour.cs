@@ -1,4 +1,4 @@
-﻿namespace CircleDefenseGame.Game.Behaviours
+﻿namespace CircleDefenseGame.Game.Behaviour
 {
     internal interface IBehaviour
     {

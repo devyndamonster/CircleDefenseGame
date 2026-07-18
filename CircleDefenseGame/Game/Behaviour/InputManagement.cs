@@ -1,6 +1,6 @@
 ﻿using Raylib_cs;
 
-namespace CircleDefenseGame.Game.Behaviours
+namespace CircleDefenseGame.Game.Behaviour
 {
     public class InputManagement : IBehaviour
     {

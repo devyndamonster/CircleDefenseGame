@@ -1,4 +1,4 @@
-﻿namespace CircleDefenseGame.Game.Renderables
+﻿namespace CircleDefenseGame.Game.Rendering
 {
     public interface IRenderable
     {

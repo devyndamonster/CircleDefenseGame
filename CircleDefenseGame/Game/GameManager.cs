@@ -1,5 +1,5 @@
-﻿using CircleDefenseGame.Game.Behaviours;
-using CircleDefenseGame.Game.Renderables;
+﻿using CircleDefenseGame.Game.Behaviour;
+using CircleDefenseGame.Game.Rendering;
 using Raylib_cs;
 
 namespace CircleDefenseGame.Game
