@@ -13,11 +13,16 @@ public class BasicTests
 
         Point[] smileyFace =
         [
-            new(435, 435), new(565, 435),
+            new(425, 425), new(435, 425),
+            new(425, 435), new(435, 435),
+            new(555, 425), new(565, 425),
+            new(555, 435), new(565, 435),
+            new(455, 535), new(545, 535),
+            new(455, 545), new(545, 545),
             new(465, 555), new(535, 555),
-            new(475, 575), new(525, 575),
-            new(485, 585), new(505, 585),
-            new(495, 595)
+            new(475, 565), new(525, 565),
+            new(485, 575), new(495, 575),
+            new(505, 575), new(515, 575)
         ];
 
         foreach (Point point in smileyFace)
