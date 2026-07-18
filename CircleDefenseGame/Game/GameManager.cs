@@ -1,4 +1,5 @@
 ﻿using CircleDefenseGame.Game.Behaviour;
+using CircleDefenseGame.Game.Interaction;
 using CircleDefenseGame.Game.Rendering;
 using Raylib_cs;
 
@@ -12,6 +13,8 @@ namespace CircleDefenseGame.Game
 
         public Random Random { get; init; }
 
+        public List<Coin> Coins { get; } = [];
+
         private List<IBehaviour> Behaviours { get; set; } = [];
 
         public GameManager(GameSettings settings)
@@ -20,7 +23,7 @@ namespace CircleDefenseGame.Game
             Random = new Random(settings.GameSeed);
 
             Behaviours = [
-                new RandomlyAddRedSquares(),
+                new RandomlyAddCoins(),
                 new InputManagement()
             ];
 
@@ -38,7 +41,10 @@ namespace CircleDefenseGame.Game
 
         public IEnumerable<IRenderable> GetRenderables()
         {
-            return Tiles.Values.SelectMany(row => row.Values);
+            return Tiles.Values
+                .SelectMany(row => row.Values)
+                .OfType<IRenderable>()
+                .Concat(Coins);
         }
 
         private Dictionary<int, Dictionary<int, Tile>> CreateRandomGrid()

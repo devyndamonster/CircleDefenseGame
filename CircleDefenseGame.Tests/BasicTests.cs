@@ -50,17 +50,17 @@ public class BasicTests
     }
 
     [Test]
-    public async Task ItWillDrawRedSquaresRandomly_AfterTimeHasPassed()
+    public async Task ItWillDrawCoinsRandomly_AfterTimeHasPassed()
     {
         using GameRunner gameRunner = new();
         using Process game = gameRunner.StartGame();
 
-        await Task.Delay(TimeSpan.FromSeconds(5));
+        await Task.Delay(TimeSpan.FromSeconds(3));
 
         Bitmap currentScreen = ScreenshotCapture.CaptureGameScreenshot(game);
 
         //If the baseline image doesn't exist, this will create it. If it does exist, it will compare the current screenshot to the baseline.
-        await Assert.That(ImageComparison.DoesImageMatchExistingSnapshot(currentScreen, "RedTilesAfterFiveSeconds")).IsTrue();
+        await Assert.That(ImageComparison.DoesImageMatchExistingSnapshot(currentScreen, "CoinsAfterThreeSeconds")).IsTrue();
     }
 
 
