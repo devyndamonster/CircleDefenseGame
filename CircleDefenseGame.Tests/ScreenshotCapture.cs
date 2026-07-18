@@ -114,6 +114,7 @@ internal static class ScreenshotCapture
                 1,
                 item.Size);
         using GraphicsCaptureSession session = framePool.CreateCaptureSession(item);
+        session.IsCursorCaptureEnabled = false;
         var frameCompletion = new TaskCompletionSource<CanvasBitmap>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
