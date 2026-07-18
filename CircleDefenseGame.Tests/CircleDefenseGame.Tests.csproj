@@ -21,4 +21,8 @@
     <ProjectReference Include="..\CircleDefenseGame\CircleDefenseGame.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Snapshots\" />
+  </ItemGroup>
+
 </Project>
