@@ -20,7 +20,8 @@ namespace CircleDefenseGame.Game
             Random = new Random(settings.GameSeed);
 
             Behaviours = [
-                new RandomlyAddRedSquares()
+                new RandomlyAddRedSquares(),
+                new InputManagement()
             ];
 
             Tiles = CreateRandomGrid();
