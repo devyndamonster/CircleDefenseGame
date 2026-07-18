@@ -7,7 +7,7 @@ using Windows.Foundation;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 
-namespace CircleDefenseGame.Tests;
+namespace CircleDefenseGame.Tests.TestUtilities;
 
 internal static class ScreenshotCapture
 {

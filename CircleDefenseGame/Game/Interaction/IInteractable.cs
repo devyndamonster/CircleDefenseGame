@@ -1,9 +1,11 @@
 ﻿namespace CircleDefenseGame.Game.Interaction
 {
-    public interface IInteractable
+    public interface IInteractable : IEntity
     {
-        public void MouseDown();
+        public bool IsMouseOver(int mouseX, int mouseY);
 
-        public void MouseUp();
+        public void MouseDown(GameManager game);
+
+        public void MouseUp(GameManager game);
     }
 }

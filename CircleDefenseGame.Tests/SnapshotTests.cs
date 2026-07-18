@@ -1,10 +1,17 @@
+using CircleDefenseGame.Tests.TestUtilities;
 using System.Diagnostics;
 using System.Drawing;
 
 namespace CircleDefenseGame.Tests;
 
-public class BasicTests
+public class SnapshotTests
 {
+    [Test]
+    public async Task ItWillRemoveCoin_WhenCoinIsClicked()
+    {
+
+    }
+
     [Test]
     public async Task ItWillDrawASmileyFace_WhenDrawnWithMouseClicks()
     {

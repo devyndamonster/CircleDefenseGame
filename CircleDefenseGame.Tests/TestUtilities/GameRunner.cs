@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
-namespace CircleDefenseGame.Tests;
+namespace CircleDefenseGame.Tests.TestUtilities;
 
 internal sealed class GameRunner : IDisposable
 {

@@ -3,7 +3,7 @@ using Raylib_cs;
 
 namespace CircleDefenseGame.Game.Interaction
 {
-    public class Coin : IEntity, IInteractable, IRenderable
+    public class Coin : IInteractable, IRenderable
     {
         public required int X { get; set; }
 
@@ -11,14 +11,23 @@ namespace CircleDefenseGame.Game.Interaction
 
         public required int Radius { get; set; }
 
-        public void MouseDown()
+        public bool IsMouseOver(int mouseX, int mouseY)
         {
-            throw new NotImplementedException();
+            return Math.Sqrt(Math.Pow(mouseX - X, 2) + Math.Pow(mouseY - Y, 2)) <= Radius;
         }
 
-        public void MouseUp()
+        public void MouseDown(GameManager game)
         {
-            throw new NotImplementedException();
+        }
+
+        public void MouseUp(GameManager game)
+        {
+            DeleteCoin(game);
+        }
+
+        private void DeleteCoin(GameManager game)
+        {
+            game.Coins.Remove(this);
         }
 
         public void Render()

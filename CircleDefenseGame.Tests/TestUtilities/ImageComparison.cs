@@ -1,7 +1,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 
-namespace CircleDefenseGame.Tests;
+namespace CircleDefenseGame.Tests.TestUtilities;
 
 internal static class ImageComparison
 {
