@@ -3,7 +3,7 @@ using Color = Raylib_cs.Color;
 
 namespace CircleDefenseGame.Game.Rendering
 {
-    public class Tile : IRenderable
+    public class Tile : IRenderable, IEntity
     {
         public required int X { get; set; }
 
