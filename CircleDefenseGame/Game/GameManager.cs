@@ -1,4 +1,5 @@
 ﻿using CircleDefenseGame.Game.Behaviour;
+using CircleDefenseGame.Game.Enemies;
 using CircleDefenseGame.Game.Interaction;
 using CircleDefenseGame.Game.Rendering;
 using Raylib_cs;
@@ -31,6 +32,8 @@ namespace CircleDefenseGame.Game
 
         public List<Coin> Coins { get; } = [];
 
+        public List<Enemy> Enemies { get; } = [];
+
         private List<IBehaviour> Behaviours { get; set; } = [];
 
         public GameManager(GameSettings settings)
@@ -40,7 +43,9 @@ namespace CircleDefenseGame.Game
 
             Behaviours = [
                 new RandomlyAddCoins(),
-                new InputManagement()
+                new InputManagement(),
+                new RandomlySpawnEnemies(),
+                new UpdateEnemies(),
             ];
 
             Tiles = CreateTerrainGrid();
@@ -60,7 +65,8 @@ namespace CircleDefenseGame.Game
             return Tiles.Values
                 .SelectMany(row => row.Values)
                 .OfType<IRenderable>()
-                .Concat(Coins);
+                .Concat(Coins)
+                .Concat(Enemies);
         }
 
         private Dictionary<int, Dictionary<int, Tile>> CreateTerrainGrid()
