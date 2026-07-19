@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using CircleDefenseGame.Game;
 
 namespace CircleDefenseGame.Tests.TestUtilities;
 
@@ -15,10 +15,16 @@ internal sealed class GameRunner : IDisposable
     private static readonly TimeSpan WindowReadyDelay = TimeSpan.FromMilliseconds(200);
 
     private readonly object sync = new();
-    private Process? currentGame;
+    private CancellationTokenSource? cancellationSource;
+    private Thread? gameThread;
     private bool holdsGameLock;
+    private Exception? gameException;
 
-    public Process StartGame()
+    public GameManager Game { get; private set; } = null!;
+
+    public IntPtr WindowHandle { get; private set; }
+
+    public GameManager StartGame()
     {
         DisposeCurrentGame();
         GameLock.Wait();
@@ -26,36 +32,37 @@ internal sealed class GameRunner : IDisposable
         lock (sync)
         {
             holdsGameLock = true;
+            gameException = null;
         }
 
         try
         {
-            string gameExecutablePath = Path.Combine(AppContext.BaseDirectory, "CircleDefenseGame.exe");
-
-            if (!File.Exists(gameExecutablePath))
+            var gameStarted = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationTokenSource source = new();
+            var thread = new Thread(() => RunGame(source, gameStarted))
             {
-                throw new FileNotFoundException(
-                    "The game executable was not copied to the test output directory.",
-                    gameExecutablePath);
-            }
-
-            var startInfo = new ProcessStartInfo(gameExecutablePath)
-            {
-                UseShellExecute = false,
-                WorkingDirectory = AppContext.BaseDirectory,
+                IsBackground = true
             };
-            var game = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("The game process could not be started.");
+            thread.SetApartmentState(ApartmentState.STA);
 
             lock (sync)
             {
-                currentGame = game;
+                cancellationSource = source;
+                gameThread = thread;
             }
 
-            WaitForWindow(game);
+            thread.Start();
+            if (!gameStarted.Task.Wait(StartupTimeout))
+            {
+                throw new TimeoutException("The game did not create a window within 10 seconds.");
+            }
+
+            gameStarted.Task.GetAwaiter().GetResult();
+            ThrowIfGameExited();
             Thread.Sleep(WindowReadyDelay);
 
-            return Process.GetProcessById(game.Id);
+            return Game;
         }
         catch
         {
@@ -70,14 +77,16 @@ internal sealed class GameRunner : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public void ClickGameWindow(Process game, Point clientPoint)
+    public void ClickGameWindow(Point clientPoint)
     {
-        if (game.HasExited)
-        {
-            throw new InvalidOperationException("The game exited before it could receive a click.");
-        }
+        ThrowIfGameExited();
 
         SetProcessDpiAwarenessContext(new IntPtr(-4));
+
+        if (!SetForegroundWindow(WindowHandle))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not activate the game window.");
+        }
 
         var screenPoint = new NativePoint
         {
@@ -85,7 +94,7 @@ internal sealed class GameRunner : IDisposable
             Y = clientPoint.Y
         };
 
-        if (!ClientToScreen(game.MainWindowHandle, ref screenPoint))
+        if (!ClientToScreen(WindowHandle, ref screenPoint))
         {
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not locate the game client area.");
         }
@@ -104,28 +113,37 @@ internal sealed class GameRunner : IDisposable
 
     private void DisposeCurrentGame()
     {
-        Process? game;
+        CancellationTokenSource? source;
+        Thread? thread;
         bool releaseGameLock;
 
         lock (sync)
         {
-            game = currentGame;
-            currentGame = null;
+            source = cancellationSource;
+            cancellationSource = null;
+            thread = gameThread;
+            gameThread = null;
             releaseGameLock = holdsGameLock;
             holdsGameLock = false;
         }
 
         try
         {
-            if (game is not null && !game.HasExited)
+            if (source is not null)
             {
-                game.Kill(entireProcessTree: true);
-                game.WaitForExit();
+                source.Cancel();
+            }
+
+            if (thread is not null && !thread.Join(StartupTimeout))
+            {
+                throw new TimeoutException("The game did not stop within 10 seconds.");
             }
         }
         finally
         {
-            game?.Dispose();
+            source?.Dispose();
+            Game = null!;
+            WindowHandle = IntPtr.Zero;
 
             if (releaseGameLock)
             {
@@ -134,29 +152,49 @@ internal sealed class GameRunner : IDisposable
         }
     }
 
-    private void WaitForWindow(Process game)
+    private void RunGame(CancellationTokenSource source, TaskCompletionSource gameStarted)
     {
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
-        while (stopwatch.Elapsed < StartupTimeout)
+        try
         {
-            game.Refresh();
+            Program.Run(
+                new GameSettings
+                {
+                    GameSeed = 12343,
+                    GridHeight = 100,
+                    GridWidth = 100,
+                    TileSize = 10
+                },
+                source.Token,
+                (game, windowHandle) =>
+                {
+                    if (windowHandle == IntPtr.Zero)
+                    {
+                        throw new InvalidOperationException("The game created a window without a handle.");
+                    }
 
-            if (game.MainWindowHandle != IntPtr.Zero)
-            {
-                return;
-            }
+                    Game = game;
+                    WindowHandle = windowHandle;
+                    gameStarted.TrySetResult();
+                });
+        }
+        catch (Exception exception)
+        {
+            gameException = exception;
+            gameStarted.TrySetException(exception);
+        }
+    }
 
-            if (game.HasExited)
-            {
-                throw new InvalidOperationException(
-                    $"The game exited with code {game.ExitCode} before creating its window.");
-            }
-
-            Thread.Sleep(TimeSpan.FromMilliseconds(50));
+    private void ThrowIfGameExited()
+    {
+        if (gameException is not null)
+        {
+            throw new InvalidOperationException("The game exited unexpectedly.", gameException);
         }
 
-        throw new TimeoutException("The game did not create a window within 10 seconds.");
+        if (gameThread is null || !gameThread.IsAlive)
+        {
+            throw new InvalidOperationException("The game exited before it could be used.");
+        }
     }
 
     private static void SendMouseInput(uint flags)
@@ -179,6 +217,10 @@ internal sealed class GameRunner : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr windowHandle);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint inputCount, Input[] inputs, int inputSize);

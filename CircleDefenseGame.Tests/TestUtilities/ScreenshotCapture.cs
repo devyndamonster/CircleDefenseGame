@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -15,15 +14,14 @@ internal static class ScreenshotCapture
     private static readonly Guid GraphicsCaptureItemGuid =
         new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
 
-    public static Bitmap CaptureGameScreenshot(Process game)
+    public static Bitmap CaptureGameScreenshot(IntPtr windowHandle)
     {
-        if (game.HasExited)
+        if (windowHandle == IntPtr.Zero)
         {
-            throw new InvalidOperationException(
-                $"The game exited with code {game.ExitCode} before its screenshot was captured.");
+            throw new InvalidOperationException("The game window is not available for capture.");
         }
 
-        return CaptureWindowScreenshotAsync(game.MainWindowHandle, CancellationToken.None)
+        return CaptureWindowScreenshotAsync(windowHandle, CancellationToken.None)
             .GetAwaiter()
             .GetResult();
     }

@@ -3,46 +3,64 @@ using Raylib_cs;
 
 namespace CircleDefenseGame;
 
-internal static class Program
+public static class Program
 {
-    private static GameManager Game = null!;
-    private static int WindowWidth;
-    private static int WindowHeight;
-
     [STAThread]
     private static void Main()
     {
-        var settings = new GameSettings
+        Run(CreateDefaultSettings(), CancellationToken.None, null);
+    }
+
+    public static void Run(
+        GameSettings settings,
+        CancellationToken cancellationToken,
+        Action<GameManager, IntPtr>? gameStarted)
+    {
+        var game = new GameManager(settings);
+        int windowWidth = settings.GridWidth * settings.TileSize;
+        int windowHeight = settings.GridHeight * settings.TileSize;
+
+        Raylib.InitWindow(windowWidth, windowHeight, "Circle Defense Game");
+        Raylib.SetTargetFPS(60);
+
+        try
+        {
+            gameStarted?.Invoke(game, GetWindowHandle());
+
+            while (!cancellationToken.IsCancellationRequested && !Raylib.WindowShouldClose())
+            {
+                game.Tick();
+
+                Raylib.BeginDrawing();
+                Raylib.ClearBackground(Color.Black);
+
+                foreach (var renderable in game.GetRenderables())
+                {
+                    renderable.Render();
+                }
+
+                Raylib.EndDrawing();
+            }
+        }
+        finally
+        {
+            Raylib.CloseWindow();
+        }
+    }
+
+    private static GameSettings CreateDefaultSettings()
+    {
+        return new GameSettings
         {
             GameSeed = 12343,
             GridHeight = 100,
             GridWidth = 100,
             TileSize = 10
         };
+    }
 
-        Game = new GameManager(settings);
-
-        WindowWidth = settings.GridWidth * settings.TileSize;
-        WindowHeight = settings.GridHeight * settings.TileSize;
-
-        Raylib.InitWindow(WindowWidth, WindowHeight, "Circle Defense Game");
-        Raylib.SetTargetFPS(60);
-
-        while (!Raylib.WindowShouldClose())
-        {
-            Game.Tick();
-
-            Raylib.BeginDrawing();
-            Raylib.ClearBackground(Color.Black);
-
-            foreach (var renderable in Game.GetRenderables())
-            {
-                renderable.Render();
-            }
-
-            Raylib.EndDrawing();
-        }
-
-        Raylib.CloseWindow();
+    private static unsafe IntPtr GetWindowHandle()
+    {
+        return new IntPtr(Raylib.GetWindowHandle());
     }
 }
