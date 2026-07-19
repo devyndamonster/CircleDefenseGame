@@ -1,4 +1,5 @@
 using CircleDefenseGame.Tests.TestUtilities;
+using CircleDefenseGame.Tests.TestUtilities.Extensions;
 using System.Drawing;
 
 namespace CircleDefenseGame.Tests;
@@ -8,7 +9,21 @@ public class SnapshotTests
     [Test]
     public async Task ItWillRemoveCoin_WhenCoinIsClicked()
     {
+        using GameRunner gameRunner = new();
+        gameRunner.StartGame();
 
+        await Task.Delay(TimeSpan.FromMilliseconds(1200));
+
+        await Assert.That(gameRunner.Game.Coins.Count).IsGreaterThan(0);
+        await Assert.That(gameRunner).MatchesExistingSnapshot("BeforeClick");
+
+        var coin = gameRunner.Game.Coins[0];
+        gameRunner.ClickGameWindow(new Point(coin.X, coin.Y));
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        await Assert.That(gameRunner.Game.Coins.Contains(coin)).IsFalse();
+        await Assert.That(gameRunner).MatchesExistingSnapshot("AfterClick");
     }
 
     [Test]
@@ -38,9 +53,7 @@ public class SnapshotTests
 
         await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-        using Bitmap currentScreen = ScreenshotCapture.CaptureGameScreenshot(gameRunner.WindowHandle);
-
-        await Assert.That(ImageComparison.DoesImageMatchExistingSnapshot(currentScreen, "SmileyFaceAfterClicks")).IsTrue();
+        await Assert.That(gameRunner).MatchesExistingSnapshot("SmileyFaceAfterClicks");
     }
 
     [Test]
@@ -49,10 +62,7 @@ public class SnapshotTests
         using GameRunner gameRunner = new();
         gameRunner.StartGame();
 
-        Bitmap currentScreen = ScreenshotCapture.CaptureGameScreenshot(gameRunner.WindowHandle);
-
-        //If the baseline image doesn't exist, this will create it. If it does exist, it will compare the current screenshot to the baseline.
-        await Assert.That(ImageComparison.DoesImageMatchExistingSnapshot(currentScreen, "InitialGrid")).IsTrue();
+        await Assert.That(gameRunner).MatchesExistingSnapshot("InitialScreen");
     }
 
     [Test]
@@ -63,10 +73,7 @@ public class SnapshotTests
 
         await Task.Delay(TimeSpan.FromSeconds(3));
 
-        Bitmap currentScreen = ScreenshotCapture.CaptureGameScreenshot(gameRunner.WindowHandle);
-
-        //If the baseline image doesn't exist, this will create it. If it does exist, it will compare the current screenshot to the baseline.
-        await Assert.That(ImageComparison.DoesImageMatchExistingSnapshot(currentScreen, "CoinsAfterThreeSeconds")).IsTrue();
+        await Assert.That(gameRunner).MatchesExistingSnapshot("CoinsAfterThreeSeconds");
         await Assert.That(gameRunner.Game.Coins.Count).IsGreaterThan(0);
     }
 

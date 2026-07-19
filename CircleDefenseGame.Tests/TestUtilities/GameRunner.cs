@@ -1,11 +1,11 @@
+using CircleDefenseGame.Game;
 using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.InteropServices;
-using CircleDefenseGame.Game;
 
 namespace CircleDefenseGame.Tests.TestUtilities;
 
-internal sealed class GameRunner : IDisposable
+public class GameRunner : IDisposable
 {
     private const uint InputMouse = 0;
     private const uint MouseEventLeftDown = 0x0002;
