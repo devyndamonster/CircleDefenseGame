@@ -20,6 +20,7 @@ public static class Program
         int windowWidth = settings.GridWidth * settings.TileSize;
         int windowHeight = settings.GridHeight * settings.TileSize;
 
+        Raylib.SetConfigFlags(ConfigFlags.UndecoratedWindow);
         Raylib.InitWindow(windowWidth, windowHeight, "Circle Defense Game");
         Raylib.SetTargetFPS(60);
 
