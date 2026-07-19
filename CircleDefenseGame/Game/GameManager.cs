@@ -7,6 +7,22 @@ namespace CircleDefenseGame.Game
 {
     public class GameManager
     {
+        private static readonly Color[] GrassColors =
+        [
+            new(54, 112, 47, 255),
+            new(64, 124, 52, 255),
+            new(74, 139, 57, 255),
+            new(88, 151, 66, 255)
+        ];
+
+        private static readonly Color[] DirtColors =
+        [
+            new(119, 78, 42, 255),
+            new(134, 90, 49, 255),
+            new(151, 104, 58, 255),
+            new(169, 120, 70, 255)
+        ];
+
         public Dictionary<int, Dictionary<int, Tile>> Tiles { get; init; }
 
         public GameSettings GameSettings { get; init; }
@@ -27,7 +43,7 @@ namespace CircleDefenseGame.Game
                 new InputManagement()
             ];
 
-            Tiles = CreateRandomGrid();
+            Tiles = CreateTerrainGrid();
             GenerateMiddleCircle();
         }
 
@@ -47,27 +63,27 @@ namespace CircleDefenseGame.Game
                 .Concat(Coins);
         }
 
-        private Dictionary<int, Dictionary<int, Tile>> CreateRandomGrid()
+        private Dictionary<int, Dictionary<int, Tile>> CreateTerrainGrid()
         {
-            var colors = new Dictionary<int, Dictionary<int, Tile>>();
+            var tiles = new Dictionary<int, Dictionary<int, Tile>>();
 
             for (int row = 0; row < GameSettings.GridHeight; row++)
             {
-                colors[row] = new Dictionary<int, Tile>();
+                tiles[row] = new Dictionary<int, Tile>();
 
                 for (int col = 0; col < GameSettings.GridWidth; col++)
                 {
-                    colors[row][col] = new Tile
+                    tiles[row][col] = new Tile
                     {
                         X = col * GameSettings.TileSize,
                         Y = row * GameSettings.TileSize,
                         Size = GameSettings.TileSize,
-                        Color = new Color((byte)Random.Next(256), (byte)Random.Next(256), (byte)Random.Next(256), byte.MaxValue)
+                        Color = GetRandomGrassColor()
                     };
                 }
             }
 
-            return colors;
+            return tiles;
         }
 
         private void GenerateMiddleCircle()
@@ -78,11 +94,22 @@ namespace CircleDefenseGame.Game
                 {
                     if (IsInsideCenterCircle(row, col))
                     {
-                        Tiles[row][col].Color = Color.White;
+                        Tiles[row][col].Color = GetRandomColor(DirtColors, Random);
                     }
                 }
             }
         }
+
+        private Color GetRandomGrassColor()
+        {
+            int red = Random.Next(256);
+            int green = Random.Next(256);
+            int blue = Random.Next(256);
+
+            return GrassColors[(red + green + blue) % GrassColors.Length];
+        }
+
+        private static Color GetRandomColor(Color[] colors, Random random) => colors[random.Next(colors.Length)];
 
         private bool IsInsideCenterCircle(int row, int column)
         {
