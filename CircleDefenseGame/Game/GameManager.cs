@@ -1,6 +1,7 @@
 ﻿using CircleDefenseGame.Game.Behaviour;
 using CircleDefenseGame.Game.Enemies;
 using CircleDefenseGame.Game.Interaction;
+using CircleDefenseGame.Game.Players;
 using CircleDefenseGame.Game.Rendering;
 using Raylib_cs;
 
@@ -34,6 +35,8 @@ namespace CircleDefenseGame.Game
 
         public List<Enemy> Enemies { get; } = [];
 
+        public Player Player { get; init; }
+
         private List<IBehaviour> Behaviours { get; set; } = [];
 
         public GameManager(GameSettings settings)
@@ -50,6 +53,12 @@ namespace CircleDefenseGame.Game
 
             Tiles = CreateTerrainGrid();
             GenerateMiddleCircle();
+
+            Player = new Player
+            {
+                X = GameSettings.GridWidth * GameSettings.TileSize / 2,
+                Y = GameSettings.GridHeight * GameSettings.TileSize / 2
+            };
         }
 
         public void Tick()
@@ -66,7 +75,8 @@ namespace CircleDefenseGame.Game
                 .SelectMany(row => row.Values)
                 .OfType<IRenderable>()
                 .Concat(Coins)
-                .Concat(Enemies);
+                .Concat(Enemies)
+                .Append(Player);
         }
 
         private Dictionary<int, Dictionary<int, Tile>> CreateTerrainGrid()

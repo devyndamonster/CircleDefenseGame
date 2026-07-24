@@ -1,4 +1,5 @@
 ﻿using CircleDefenseGame.Game.Interaction;
+using CircleDefenseGame.Game.Players;
 using Raylib_cs;
 
 namespace CircleDefenseGame.Game.Behaviour
@@ -10,6 +11,32 @@ namespace CircleDefenseGame.Game.Behaviour
         private List<IInteractable> activeInteractions = [];
 
         public void Tick(GameManager game)
+        {
+            UpdateMovement(game);
+            UpdateMouse(game);
+        }
+
+        public void UpdateMovement(GameManager game)
+        {
+            if (Raylib.IsKeyDown(KeyboardKey.W))
+            {
+                game.Player.MoveDirection(Direction.Up);
+            }
+            if (Raylib.IsKeyDown(KeyboardKey.S))
+            {
+                game.Player.MoveDirection(Direction.Down);
+            }
+            if (Raylib.IsKeyDown(KeyboardKey.A))
+            {
+                game.Player.MoveDirection(Direction.Left);
+            }
+            if (Raylib.IsKeyDown(KeyboardKey.D))
+            {
+                game.Player.MoveDirection(Direction.Right);
+            }
+        }
+
+        private void UpdateMouse(GameManager game)
         {
             var mousePosition = Raylib.GetMousePosition();
             int x = (int)mousePosition.X;
