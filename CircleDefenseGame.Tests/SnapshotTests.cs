@@ -4,33 +4,33 @@ using System.Drawing;
 
 namespace CircleDefenseGame.Tests;
 
-public class SnapshotTests
+[ClassDataSource<SnapshotTestFixture>(Shared = SharedType.None)]
+public class SnapshotTests(SnapshotTestFixture Fixture)
 {
     [Test]
+
     public async Task ItWillRemoveCoin_WhenCoinIsClicked()
     {
-        using GameRunner gameRunner = new();
-        gameRunner.StartGame();
+        Fixture.GameRunner.StartGame();
 
         await Task.Delay(TimeSpan.FromMilliseconds(1200));
 
-        await Assert.That(gameRunner.Game.Coins.Count).IsGreaterThan(0);
-        await Assert.That(gameRunner).MatchesExistingSnapshot("BeforeClick");
+        await Assert.That(Fixture.GameRunner.Game.Coins.Count).IsGreaterThan(0);
+        await Assert.That(Fixture.GameRunner).MatchesExistingSnapshot("BeforeClick");
 
-        var coin = gameRunner.Game.Coins[0];
-        gameRunner.ClickGameWindow(new Point(coin.X, coin.Y));
+        var coin = Fixture.GameRunner.Game.Coins[0];
+        Fixture.GameRunner.ClickGameWindow(new Point(coin.X, coin.Y));
 
         await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-        await Assert.That(gameRunner.Game.Coins.Contains(coin)).IsFalse();
-        await Assert.That(gameRunner).MatchesExistingSnapshot("AfterClick");
+        await Assert.That(Fixture.GameRunner.Game.Coins.Contains(coin)).IsFalse();
+        await Assert.That(Fixture.GameRunner).MatchesExistingSnapshot("AfterClick");
     }
 
     [Test]
     public async Task ItWillDrawASmileyFace_WhenDrawnWithMouseClicks()
     {
-        using GameRunner gameRunner = new();
-        gameRunner.StartGame();
+        Fixture.GameRunner.StartGame();
 
         Point[] smileyFace =
         [
@@ -48,33 +48,31 @@ public class SnapshotTests
 
         foreach (Point point in smileyFace)
         {
-            gameRunner.ClickGameWindow(point);
+            Fixture.GameRunner.ClickGameWindow(point);
         }
 
         await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-        await Assert.That(gameRunner).MatchesExistingSnapshot("SmileyFaceAfterClicks");
+        await Assert.That(Fixture.GameRunner).MatchesExistingSnapshot("SmileyFaceAfterClicks");
     }
 
     [Test]
     public async Task ItWillDisplayInitialScreen()
     {
-        using GameRunner gameRunner = new();
-        gameRunner.StartGame();
+        Fixture.GameRunner.StartGame();
 
-        await Assert.That(gameRunner).MatchesExistingSnapshot("InitialScreen");
+        await Assert.That(Fixture.GameRunner).MatchesExistingSnapshot("InitialScreen");
     }
 
     [Test]
     public async Task ItWillDrawCoinsRandomly_AfterTimeHasPassed()
     {
-        using GameRunner gameRunner = new();
-        gameRunner.StartGame();
+        Fixture.GameRunner.StartGame();
 
         await Task.Delay(TimeSpan.FromSeconds(3));
 
-        await Assert.That(gameRunner).MatchesExistingSnapshot("CoinsAfterThreeSeconds");
-        await Assert.That(gameRunner.Game.Coins.Count).IsGreaterThan(0);
+        await Assert.That(Fixture.GameRunner).MatchesExistingSnapshot("CoinsAfterThreeSeconds");
+        await Assert.That(Fixture.GameRunner.Game.Coins.Count).IsGreaterThan(0);
     }
 
 

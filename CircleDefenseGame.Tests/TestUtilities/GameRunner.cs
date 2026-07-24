@@ -10,14 +10,11 @@ public class GameRunner : IDisposable
     private const uint InputMouse = 0;
     private const uint MouseEventLeftDown = 0x0002;
     private const uint MouseEventLeftUp = 0x0004;
-    private static readonly SemaphoreSlim GameLock = new(1, 1);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan WindowReadyDelay = TimeSpan.FromMilliseconds(200);
 
-    private readonly object sync = new();
     private CancellationTokenSource? cancellationSource;
     private Thread? gameThread;
-    private bool holdsGameLock;
     private Exception? gameException;
 
     public GameManager Game { get; private set; } = null!;
@@ -26,39 +23,25 @@ public class GameRunner : IDisposable
 
     public GameManager StartGame()
     {
-        DisposeCurrentGame();
-        GameLock.Wait();
-
-        lock (sync)
-        {
-            holdsGameLock = true;
-            gameException = null;
-        }
-
         try
         {
-            var gameStarted = new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            CancellationTokenSource source = new();
-            var thread = new Thread(() => RunGame(source, gameStarted))
+            var gameStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            cancellationSource = new();
+
+            gameThread = new Thread(() => RunGame(cancellationSource, gameStarted))
             {
                 IsBackground = true
             };
-            thread.SetApartmentState(ApartmentState.STA);
+            gameThread.SetApartmentState(ApartmentState.STA);
+            gameThread.Start();
 
-            lock (sync)
-            {
-                cancellationSource = source;
-                gameThread = thread;
-            }
-
-            thread.Start();
             if (!gameStarted.Task.Wait(StartupTimeout))
             {
                 throw new TimeoutException("The game did not create a window within 10 seconds.");
             }
 
             gameStarted.Task.GetAwaiter().GetResult();
+
             ThrowIfGameExited();
             Thread.Sleep(WindowReadyDelay);
 
@@ -113,46 +96,27 @@ public class GameRunner : IDisposable
 
     private void DisposeCurrentGame()
     {
-        CancellationTokenSource? source;
-        Thread? thread;
-        bool releaseGameLock;
-
-        lock (sync)
-        {
-            source = cancellationSource;
-            cancellationSource = null;
-            thread = gameThread;
-            gameThread = null;
-            releaseGameLock = holdsGameLock;
-            holdsGameLock = false;
-        }
-
         try
         {
-            if (source is not null)
+            if (cancellationSource is not null)
             {
-                source.Cancel();
+                cancellationSource.Cancel();
             }
 
-            if (thread is not null && !thread.Join(StartupTimeout))
+            if (gameThread is not null && !gameThread.Join(StartupTimeout))
             {
                 throw new TimeoutException("The game did not stop within 10 seconds.");
             }
         }
         finally
         {
-            source?.Dispose();
+            cancellationSource?.Dispose();
             Game = null!;
             WindowHandle = IntPtr.Zero;
-
-            if (releaseGameLock)
-            {
-                GameLock.Release();
-            }
         }
     }
 
-    private void RunGame(CancellationTokenSource source, TaskCompletionSource gameStarted)
+    private void RunGame(CancellationTokenSource cancellation, TaskCompletionSource gameStarted)
     {
         try
         {
@@ -164,7 +128,7 @@ public class GameRunner : IDisposable
                     GridWidth = 100,
                     TileSize = 10
                 },
-                source.Token,
+                cancellation.Token,
                 (game, windowHandle) =>
                 {
                     if (windowHandle == IntPtr.Zero)
